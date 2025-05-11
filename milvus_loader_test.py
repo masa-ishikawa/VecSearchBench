@@ -15,6 +15,7 @@ class MilvusLoadTest(AbstractLoaderTest):
         :param tps: Number of SQL queries per second
         :param duration: Test execution time in seconds
         :param timeout: Timeout value (in seconds) for each batch
+        :param query: Query of vector search
         :param config: Configuration content. If not provided, "config.yaml" will be loaded and logging will be configured automatically.
         """
         if config is None:
