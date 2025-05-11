@@ -10,7 +10,7 @@ from oci.generative_ai_inference.models import (
 )
 
 class MilvusLoadTest(AbstractLoaderTest):
-    def __init__(self, tps, duration, timeout, query):
+    def __init__(self, tps, duration, timeout, query, config=None):
         """
         :param tps: Number of SQL queries per second
         :param duration: Test execution time in seconds
@@ -72,5 +72,5 @@ class MilvusLoadTest(AbstractLoaderTest):
 
 if __name__ == "__main__":
     # Main execution: create an instance with the required parameters and run the test
-    tester = MilvusClient(tps=100, duration=10, timeout=3)
+    tester = MilvusLoadTest(tps=100, duration=10, timeout=3, query="サヴォワ地方はどこの国？")
     tester.run_test()
