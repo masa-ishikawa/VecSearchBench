@@ -37,8 +37,7 @@ class AbstractLoaderTest(ABC):
         """
         with ThreadPoolExecutor(max_workers=self.tps * 2) as executor:
             for i in range(self.duration):
-                batch_futures = [executor.submit(
-                    self.execute_query) for _ in range(self.tps)]
+                batch_futures = [executor.submit(self.execute_query) for _ in range(self.tps)]
                 batch_start = time.time()
                 done, not_done = wait(batch_futures, timeout=self.timeout)
 
@@ -74,16 +73,15 @@ class AbstractLoaderTest(ABC):
 
     @staticmethod
     def setup_logging():
-        """Configure logging (append if the file for the current day exists)"""
         current_date = datetime.datetime.now().strftime("%Y%m%d")
         log_filename = f"vectordbtest_{current_date}.log"
-        logging.basicConfig(
-            level=logging.DEBUG,
-            filename=log_filename,
-            filemode='a',
-            encoding='utf-8',
-            format='%(asctime)s - %(levelname)s - %(message)s'
-        )
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        file_handler = logging.FileHandler(log_filename, encoding='utf-8', mode='a')
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+        root_logger.handlers = [file_handler, console_handler]
 
     def _generate_unique_comment(self):
         """Generate a random string for cache busting"""

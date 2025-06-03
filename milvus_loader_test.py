@@ -1,4 +1,5 @@
 import logging
+import os
 import yaml
 from abstract_loader_test import AbstractLoaderTest
 from pymilvus import MilvusClient
@@ -11,33 +12,37 @@ from oci.generative_ai_inference.models import (
 
 class MilvusLoadTest(AbstractLoaderTest):
     def __init__(self, tps, duration, timeout, query, config=None):
-        """
-        :param tps: Number of SQL queries per second
-        :param duration: Test execution time in seconds
-        :param timeout: Timeout value (in seconds) for each batch
-        :param query: Query of vector search
-        :param config: Configuration content. If not provided, "config.yaml" will be loaded and logging will be configured automatically.
-        """
         if config is None:
             AbstractLoaderTest.setup_logging()
+            logging.getLogger().setLevel(logging.DEBUG)
             config = self.load_config("config.yaml")
         self.config = config
         super().__init__(tps, duration, timeout)
-        # Create Milvus connection
-        self.client = MilvusClient(
-            uri=self.config["milvus_uri"]
-        )
+
+        # --- DEBUG LOG for Milvus ---
+        logging.debug("Connecting to Milvus with:")
+        logging.debug(f"  uri             : {self.config['milvus_uri']}")
+        logging.debug(f"  collection_name : {self.config['collection_name']}")
+        logging.debug(f"  output_fields   : {self.config['output_fields']}")
+
+        self.client = MilvusClient(uri=self.config["milvus_uri"])
+
+        # --- DEBUG LOG for GenAI ---
+        logging.debug("Embedding using OCI GenAI with:")
+        logging.debug(f"  endpoint        : {self.config['service_endpoint']}")
+        logging.debug(f"  compartment_id  : {self.config['compartment_id']}")
+        logging.debug(f"  model_id        : {self.config['emb_llm_id']}")
+        logging.debug(f"  query           : {query}")
+
         genai_client = GenerativeAiInferenceClient(
             config={},
             signer=InstancePrincipalsSecurityTokenSigner(),
-            service_endpoint="https://inference.generativeai.ap-osaka-1.oci.oraclecloud.com"
+            service_endpoint=self.config["service_endpoint"]
         )
         res = genai_client.embed_text(
             embed_text_details=EmbedTextDetails(
                 inputs=[query],
-                serving_mode=OnDemandServingMode(
-                    model_id="cohere.embed-multilingual-v3.0",
-                ),
+                serving_mode=OnDemandServingMode(model_id=self.config["emb_llm_id"]),
                 compartment_id=self.config["compartment_id"],
                 input_type="SEARCH_QUERY"
             )
@@ -46,20 +51,14 @@ class MilvusLoadTest(AbstractLoaderTest):
 
     @staticmethod
     def load_config(file_path):
-        """Load the configuration file (YAML)"""
         with open(file_path, "r", encoding="utf-8") as file:
             return yaml.safe_load(file)
     
     @property
     def EMBEDDING_VECTOR(self):
-        """The embedding vector value to be passed to the SQL query."""
         return self.config["embedding_vector"]
 
     def execute_query(self):
-        """
-        Executes the query and returns the result.
-        Appends a unique string to bypass cache.
-        """
         try:
             result = self.client.search(
                 collection_name=self.config["collection_name"],
@@ -69,9 +68,18 @@ class MilvusLoadTest(AbstractLoaderTest):
             return result
         except Exception as e:
             logging.error(f"Error during query execution: {e}")
-            raise e
+            raise
 
 if __name__ == "__main__":
-    # Main execution: create an instance with the required parameters and run the test
-    tester = MilvusLoadTest(tps=100, duration=10, timeout=3, query="サヴォワ地方はどこの国？")
+    tps = int(os.environ.get("TPS", 10))
+    duration = int(os.environ.get("DURATION", 3))
+    timeout = int(os.environ.get("TIMEOUT", 10))
+    query = os.environ.get("WORD", "サヴォワ地方はどこの国？")
+
+    tester = MilvusLoadTest(
+        tps=tps,
+        duration=duration,
+        timeout=timeout,
+        query=query
+    )
     tester.run_test()
